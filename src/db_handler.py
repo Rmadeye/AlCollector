@@ -1,70 +1,55 @@
-import mysql.connector
+from datetime import datetime
+from typing import List, Optional
 import pandas as pd
-import json
 
-# Read database connection details from the JSON file
-with open('db/db_config.json', 'r') as f:
-    config = json.load(f)
+# Class for handling the database
+class Assortiment:
+    def __init__(self, db):
+        self.db = pd.read_csv(db)
 
-# Connect to the database
-mydb = mysql.connector.connect(**config)
+    # Get all products
+    def remove_product_from_csv_by_index(self, index):
 
-class DBHandler:
-
-
-    def  __init__(self, table='', create_table=False):
-        self.table = table
-        self.mycursor = mydb.cursor()
-        self.mycursor.execute("USE liqour")
-        if create_table:
-            self.mycursor.execute(
-                f"CREATE TABLE IF NOT EXISTS {self.table} (id INT AUTO_INCREMENT PRIMARY KEY,\
-                name VARCHAR(255),\
-                voltage INT,\
-                volume INT,\
-                prod_date DATE,\
-                num_bottles INT,\
-                description VARCHAR(255))")
-
-    def get_all(self):
-        self.mycursor.execute(f"SELECT * FROM {self.table}")
-        data = self.mycursor.fetchall()
-        df = pd.DataFrame(data, columns=['id', 'name', 'voltage', 'volume', 'prod_date', 'num_bottles', 'description'])
-        return df
+        self.db = self.db.drop(index)
+        # df = df.reset_index(drop=True)
+        self.db.to_csv('./src/db.csv', index=False)
+        return 'Product removed successfully.'
     
-    def get_product(self, feature, value):
-        query = f"SELECT * FROM {self.table} WHERE {feature} = %s"
-        self.mycursor.execute(query, (value,))
-        data = self.mycursor.fetchall()
-        
-        if data is None:
-            return "No record found with the provided id."
-        else:
-            return pd.DataFrame(data, columns=['id', 'name', 'voltage', 'volume', 'prod_date', 'num_bottles', 'description'])
 
-        
-    def add_entry(self, name, voltage, volume, prod_date, num_bottles, description):
-        sql = f"INSERT INTO {self.table} (name, voltage, volume, prod_date, num_bottles, description) VALUES (%s, %s, %s, %s, %s, %s)"
-        val = (name, voltage, volume, prod_date, num_bottles, description)
-        self.mycursor.execute(sql, val)
-        mydb.commit()
-        print(self.mycursor.rowcount, "record inserted.")
-        return "Added successfully."
+    def remove(self,index):
+        self.db.drop(index=index-1, inplace=True)
+        # df  = df.reset_index()
+        self.db.to_csv('./src/db.csv', index=False)
+        print("here")
+        return 'Product removed successfully.'
+    
+    def add(self, name, volume, strength, date_of_production, bottles, comment):
+        new_product = {'index':  len(self.db) + 1,
+            'name': name,
+            'volume': volume,
+            'strength': strength,
+            'date_of_production': date_of_production,
+            'bottles': bottles,
+            'comments': comment,
+        }
 
-    def delete_entry(self, id):
-        self.mycursor.execute(f"DELETE FROM {self.table} WHERE id = {id}")
-        mydb.commit()
-        if self.mycursor.rowcount > 0:
-            return "Deleted"
-        else:
-            return "No record found with the provided id."
+        self.db = pd.concat([self.db, pd.DataFrame([new_product])], ignore_index=True)
+        return self.db.to_csv('./src/db.csv', index=False)
+    
+    def get_statistics(self):
+        df = self.db
+        grouped_summary = df.groupby('name')
+        summary = grouped_summary.agg({'bottles': 'sum', 'volume': 'sum', 'strength': 'mean'})
+        #round strenght to 1 decimal
+        summary['strength'] = summary['strength'].round(1)
+        summary = summary.rename(columns={'bottles': 'total_bottles', 'volume': 'total_volume'})
+        # add total sum of bottles and volume
+        summary.loc['Total'] = summary.sum()
+        summary['total_volume'] = (summary.total_volume/1000).round(2)
+        summary['total_bottles'] = summary.total_bottles.astype(int)
+        # and mean the strength in total
+        summary.loc['Total', 'strength'] = summary['strength'].mean().round(1)
+        summary = summary.reset_index()
+        # return summary.to_csv('./src/summary.csv', index=False)
+        return summary
 
-
-    def update_entry(self, id, feature, value):
-        sql = f"UPDATE {self.table} SET {feature} = %s WHERE id = {id}"
-        self.mycursor.execute(sql, (value,))
-        mydb.commit()
-        if self.mycursor.rowcount == 0:
-            return "No record found with the provided id."
-        else:
-            return f"{self.mycursor.rowcount} record(s) affected"

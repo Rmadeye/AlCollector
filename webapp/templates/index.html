@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rafcio's liquor store</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+    
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+    
+        th {
+            background-color: #f2f2f2;
+        }
+    
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+    
+        .remove-button {
+            background-color: #f44336;
+            color: #fff;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+    
+        .remove-button:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+    
+    <script>
+        function removeRow(rowId, rowIndex) {
+            var rowElement = document.getElementById(rowId);
+            rowElement.parentNode.removeChild(rowElement);
+            // Send an AJAX request to the server to remove the row
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", "/remove/" + rowIndex, true);
+            xhr.send();
+        }
+    </script>
+<script>
+    function addProduct() {
+        var name = document.getElementById('name').value;
+        var volume = document.getElementById('volume').value;
+        var strength = document.getElementById('strength').value;
+        var dateOfProduction = document.getElementById('date_of_production').value;
+        var bottles = document.getElementById('bottles').value;
+        var comment = document.getElementById('comments').value;
+        
+        // Check if date of production is empty
+        if (dateOfProduction === '') {
+            var today = new Date().toISOString().split('T')[0];
+            dateOfProduction = today;
+        }
+        
+        // Send an AJAX request to the server to add the product
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "/add/" + encodeURIComponent(name) + "/" + encodeURIComponent(volume) + "/" + encodeURIComponent(strength) + "/" + encodeURIComponent(dateOfProduction) + "/" + encodeURIComponent(bottles) + "/" + encodeURIComponent(comment), true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                // Product added successfully, reload the page
+                location.reload();
+            }
+        };
+        xhr.send();
+    }
+</script>
+<script>
+    function setTodayDate() {
+        var today = new Date().toISOString().split('T')[0];
+        document.getElementById('date_of_production').value = today;
+    }
+</script>  
+<script>
+    function calcDilution() {
+        var volume = document.getElementById('vol').value;
+        var conc = document.getElementById('perc').value;
+        var desired = document.getElementById('desired').value;
+
+        // Send an AJAX request to the server to calculate the dilution
+        var xhr = new XMLHttpRequest();
+        var url = "/calculate?volume=" + encodeURIComponent(volume) + "&conc=" + encodeURIComponent(conc) + "&desired=" + encodeURIComponent(desired);
+        xhr.open("GET", url, true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                var response = JSON.parse(xhr.responseText);
+                var result = response.result;
+
+                // Display the result
+                document.getElementById('result').innerHTML = "Dilution: You need to add " + result + " cm<sup>3</sup> of water.";
+            }
+        };
+        xhr.send();
+    }
+</script>
+
+</head>
+<body>
+    <h1>Database</h1>
+    <table>
+        <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Volume [mL]</th>
+            <th>Strength [%]</th>
+            <th>Date of Production</th>
+            <th>Number of Bottles</th>
+            <th>Comments</th>
+            <th></th>
+        </tr>
+        {% for row in rows %}
+        <tr id="row-{{ loop.index }}">
+            <td>{{ loop.index }}</td>
+            <td>{{ row['name'] }}</td>
+            <td>{{ row['volume'] }}</td>
+            <td>{{ row['strength'] }}</td>
+            <td>{{ row['date_of_production'] }}</td>
+            <td>{{ row['bottles'] }}</td>
+            <td>{{ row['comments'] }}</td>
+            <td>
+                <button class="remove-button" onclick="removeRow('row-{{ loop.index }}', '{{ loop.index }}')">Remove</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <h1>Statistics</h1>
+    <table>
+        <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Bottles</th>
+            <th>Volume [L]</th>
+            <th></th>
+        </tr>
+        {% for row in rows_summary %}
+        <tr id="row-{{ loop.index }}">
+            <td>{{ loop.index }}</td>
+            <td>{{ row['name'] }}</td>
+            <td>{{ row['total_bottles'] }}</td>
+            <td>{{ row['total_volume'] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    
+
+    <h1>Add Bottle Information</h1>
+    <form method="GET" onsubmit="event.preventDefault(); addProduct();">
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" required><br><br>
+
+        <label for="volume">Volume [mL]:</label>
+        <input type="text" id="volume" name="volume" required><br><br>
+
+        <label for="strength">Strength [%]:</label>
+        <input type="text" id="strength" name="strength" required><br><br>
+
+        <label for="date_of_production">Date of Production:</label>
+        <input type="text" id="date_of_production" name="date_of_production" value="" placeholder="yyyy-mm-dd" onfocus="setTodayDate()"><br><br>
+        
+
+        <label for="bottles">Number of bottles:</label>
+        <input type="number" id="bottles" name="bottles" required><br><br>
+
+        <label for="comments">Comment:</label>
+        <input type="text" id="comments" name="comments" required><br><br>
+
+        <input type="submit" value="Add Bottle">
+
+    </form>
+    <h1>Diluter</h1>
+    <form method="GET" onsubmit="event.preventDefault(); calcDilution();">
+        <label for="vol">Initial volume [cm<sup>3</sup>]:</label>
+        <input type="text" name="volume" id="vol"><br><br>
+    
+        <label for="perc">Current concentration [%]:</label>
+        <input type="text" name="conc" id="perc"><br><br>
+    
+        <label for="perc">Desired concentration [%]:</label>
+        <input type="text" name="desired" id="desired"><br><br>
+    
+        <input class="calculator" type="submit" value="Go!">
+    </form>
+    
+    <p id="result"></p>
+    
+    
+    
+    
+</body>
+</html>
