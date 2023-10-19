@@ -1,0 +1,6 @@
+{
+    "host": "localhost",
+    "user": "root",
+    "password": "dupa",
+    "db": "streamlit_logins"
+  }
